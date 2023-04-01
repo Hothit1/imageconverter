@@ -1,0 +1,61 @@
+const sharp = require('sharp');
+const express = require('express');
+const multer = require('multer');
+
+const app = express();
+const upload = multer({
+  dest: 'uploads/' // specify the directory to store the files
+});
+
+// served the uploaded file as static content
+app.use('/static', express.static(__dirname + '/uploads'));
+
+app.get('/', (req, res) => {
+  res.send(`
+    <html>
+      <body>
+        <form method="post" action="/" enctype="multipart/form-data">
+          <input type="file" name="image">
+          <br>
+          <label for="format">Select the format to convert:</label>
+          <select id="format" name="format">
+            <option value="jpeg">JPEG</option>
+            <option value="png">PNG</option>
+            <option value="webp">WebP</option>
+            <option value="tiff">TIFF</option>
+          </select>
+          <br>
+          <button>Convert</button>
+        </form>
+      </body>
+    </html>
+  `);
+});
+
+app.post('/', upload.single('image'), async (req, res, next) => {
+  const { mimetype, path } = req.file;
+  const { format } = req.body;
+
+  let image = sharp(path);
+  let converted = null;
+
+  if (mimetype === 'image/png') {
+    converted = format === 'jpeg' ?
+      image.jpeg().toBuffer() :
+      image.png().toBuffer();
+  } else if (mimetype === 'image/jpeg') {
+    converted = format === 'png' ?
+      image.png().toBuffer() :
+      image.toFormat(format).toBuffer();
+  } else if (mimetype === 'image/gif') {
+    converted = image.toFormat(format).toBuffer();
+  }
+
+  res.set({
+    'Content-Type': `image/${format}`,
+    'Content-Disposition': 'inline'
+  });
+  res.send(converted);
+});
+
+app.listen(3000, () => console.log('Server started on port 3000'));
